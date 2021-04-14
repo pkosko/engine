@@ -87,7 +87,8 @@ source_set("flutter_tizen") {
     "$custom_sysroot/usr/include/eo-1",
     "$custom_sysroot/usr/include/evas-1",
     "$custom_sysroot/usr/include/system",
-    "$custom_sysroot/usr/include/wayland-extension"
+    "$custom_sysroot/usr/include/wayland-extension",
+    "$custom_sysroot/usr/include/cbhm",
   ]
   
   lib_dirs = [ root_out_dir, "$custom_sysroot/usr/lib" ]
@@ -114,6 +115,7 @@ source_set("flutter_tizen") {
     "tbm",
     "tdm-client",
     "wayland-client",
+    "cbhm",
   ]
 
   if (tizen_sdk_4) {
