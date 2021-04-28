@@ -5,7 +5,6 @@
 #include "platform_channel.h"
 
 #include <app.h>
-#include <mutex>
 
 #include "flutter/shell/platform/common/cpp/json_method_codec.h"
 #include "flutter/shell/platform/tizen/tizen_log.h"
@@ -32,7 +31,6 @@ void PlatformChannel::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<rapidjson::Document>> result) {
   const auto method = call.method_name();
 
-  FT_LOGI("pkosko Called method : %s", method.c_str());
   if (method == "SystemNavigator.pop") {
     ui_app_exit();
     result->Success();
@@ -65,7 +63,6 @@ namespace Clipboard {
 
 // naive implementation using std::string as a container of internal clipboard
 // data
-std::mutex is_processing_mutex;
 std::string string_clipboard = "";
 
 static constexpr char kTextKey[] = "text";
@@ -88,20 +85,13 @@ void GetData(
     return;
   }
 
-  {
-    std::unique_lock<std::mutex> lock(is_processing_mutex);
-    if (string_clipboard.empty()) {
-      result->Error(kUnknownClipboardError, "No clipboard data available.");
-    } else {
-      rapidjson::Document document;
-      document.SetObject();
-      rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-      document.AddMember(rapidjson::Value(kTextKey, allocator),
-                         rapidjson::Value(string_clipboard, allocator),
-                         allocator);
-      result->Success(document);
-    }
-  }
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  document.AddMember(rapidjson::Value(kTextKey, allocator),
+                      rapidjson::Value(string_clipboard, allocator),
+                      allocator);
+  result->Success(document);
 }
 
 void SetData(
@@ -113,11 +103,7 @@ void SetData(
     result->Error(kUnknownClipboardError, "Invalid message format");
     return;
   }
-  {
-    std::unique_lock<std::mutex> lock(is_processing_mutex);
-    string_clipboard = itr->value.GetString();
-    FT_LOGI("pkosko Set value of clipboard : %s", string_clipboard.c_str());
-    result->Success();
-  }
+  string_clipboard = itr->value.GetString();
+  result->Success();
 }
 }  // namespace Clipboard
