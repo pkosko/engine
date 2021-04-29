@@ -709,3 +709,8 @@ void TizenRendererEvasGL::ResizeWithRotation(int32_t x, int32_t y,
 void TizenRendererEvasGL::SendRotationChangeDone() {
   elm_win_wm_rotation_manual_rotation_done(evas_window_);
 }
+
+void TizenRendererEvasGL::SetPreferredOrientations(std::vector<int> rotations) {
+  elm_win_wm_rotation_available_rotations_set(
+      evas_window_, (const int*)(rotations.data()), rotations.size());
+}

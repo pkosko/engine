@@ -218,7 +218,7 @@ bool TizenEmbedderEngine::RunEngine(
   navigation_channel = std::make_unique<NavigationChannel>(
       internal_plugin_registrar_->messenger());
   platform_channel = std::make_unique<PlatformChannel>(
-      internal_plugin_registrar_->messenger());
+      internal_plugin_registrar_->messenger(), tizen_renderer.get());
   settings_channel = std::make_unique<SettingsChannel>(
       internal_plugin_registrar_->messenger());
   text_input_channel = std::make_unique<TextInputChannel>(

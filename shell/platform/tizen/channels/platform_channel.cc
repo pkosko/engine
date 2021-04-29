@@ -6,12 +6,15 @@
 
 #include <app.h>
 
+#include <map>
+
 #include "flutter/shell/platform/common/cpp/json_method_codec.h"
 #include "flutter/shell/platform/tizen/tizen_log.h"
 
 static constexpr char kChannelName[] = "flutter/platform";
 
-PlatformChannel::PlatformChannel(flutter::BinaryMessenger* messenger)
+PlatformChannel::PlatformChannel(flutter::BinaryMessenger* messenger,
+                                 TizenRenderer* renderer)
     : channel_(std::make_unique<flutter::MethodChannel<rapidjson::Document>>(
           messenger, kChannelName, &flutter::JsonMethodCodec::GetInstance())) {
   channel_->SetMethodCallHandler(
@@ -20,6 +23,8 @@ PlatformChannel::PlatformChannel(flutter::BinaryMessenger* messenger)
           std::unique_ptr<flutter::MethodResult<rapidjson::Document>> result) {
         HandleMethodCall(call, std::move(result));
       });
+  // renderer pointer is managed by TizenEmbedderEngine
+  tizen_renderer = renderer;
 }
 
 PlatformChannel::~PlatformChannel() {}
@@ -43,7 +48,32 @@ void PlatformChannel::HandleMethodCall(
   } else if (method == "Clipboard.hasStrings") {
     result->NotImplemented();
   } else if (method == "SystemChrome.setPreferredOrientations") {
-    result->NotImplemented();
+    const std::string kPortraitUp = "DeviceOrientation.portraitUp";
+    const std::string kPortraitDown = "DeviceOrientation.portraitDown";
+    const std::string kLandscapeLeft = "DeviceOrientation.landscapeLeft";
+    const std::string kLandscapeRight = "DeviceOrientation.landscapeRight";
+    const std::map<std::string, int> orientation_mapping = {
+        {kPortraitUp, 0},
+        {kLandscapeLeft, 90},
+        {kPortraitDown, 180},
+        {kLandscapeRight, 270},
+    };
+
+    const auto& list = call.arguments()[0];
+    std::vector<int> rotations;
+    for (rapidjson::Value::ConstValueIterator itr = list.Begin();
+         itr != list.End(); ++itr) {
+      rotations.push_back(orientation_mapping.at(itr->GetString()));
+    }
+    if (rotations.size() == 0) {
+      // According do docs
+      // https://api.flutter.dev/flutter/services/SystemChrome/setPreferredOrientations.html
+      // "The empty list causes the application to defer to the operating system
+      // default."
+      rotations = {0, 90, 180, 270};
+    }
+    tizen_renderer->SetPreferredOrientations(rotations);
+    result->Success();
   } else if (method == "SystemChrome.setApplicationSwitcherDescription") {
     result->NotImplemented();
   } else if (method == "SystemChrome.setEnabledSystemUIOverlays") {
