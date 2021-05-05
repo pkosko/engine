@@ -587,7 +587,7 @@ void TizenRendererEcoreWl2::SendRotationChangeDone() {
 }
 
 void TizenRendererEcoreWl2::SetPreferredOrientations(
-    std::vector<int> rotations) {
+    const std::vector<int> &rotations) {
   ecore_wl2_window_available_rotations_set(ecore_wl2_window_, rotations.data(),
                                            rotations.size());
 }

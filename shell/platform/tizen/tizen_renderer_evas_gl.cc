@@ -710,7 +710,9 @@ void TizenRendererEvasGL::SendRotationChangeDone() {
   elm_win_wm_rotation_manual_rotation_done(evas_window_);
 }
 
-void TizenRendererEvasGL::SetPreferredOrientations(std::vector<int> rotations) {
+void TizenRendererEvasGL::SetPreferredOrientations(
+    const std::vector<int>& rotations) {
   elm_win_wm_rotation_available_rotations_set(
-      evas_window_, (const int*)(rotations.data()), rotations.size());
+      evas_window_, static_cast<const int*>(rotations.data()),
+      rotations.size());
 }
