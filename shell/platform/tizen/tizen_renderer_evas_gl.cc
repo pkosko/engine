@@ -716,3 +716,12 @@ void TizenRendererEvasGL::SetPreferredOrientations(
       evas_window_, static_cast<const int*>(rotations.data()),
       rotations.size());
 }
+
+void TizenRendererEvasGL::SetIndicatorEnabled(bool flag) {
+  FT_LOGD("pkosko SetIndicatorEnabled: %d", flag);
+  if (flag) {
+    elm_win_indicator_mode_set(evas_window_, ELM_WIN_INDICATOR_SHOW);
+  } else {
+    elm_win_indicator_mode_set(evas_window_, ELM_WIN_INDICATOR_HIDE);
+  }
+}

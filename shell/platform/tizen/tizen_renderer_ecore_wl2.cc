@@ -591,3 +591,21 @@ void TizenRendererEcoreWl2::SetPreferredOrientations(
   ecore_wl2_window_available_rotations_set(ecore_wl2_window_, rotations.data(),
                                            rotations.size());
 }
+
+void TizenRendererEcoreWl2::SetIndicatorEnabled(bool flag) {
+  FT_LOGD("pkosko SetIndicatorEnabled: %d", flag);
+  if (flag) {
+    ecore_wl2_indicator_visible_type_set(
+        ecore_wl2_window_, ECORE_WL2_INDICATOR_VISIBLE_TYPE_SHOWN);
+
+    // EAPI void ecore_wl2_window_indicator_geometry_set(
+    //     Ecore_Wl2_Window * win, int x, int y, int w, int h);
+    ecore_wl2_window_indicator_state_set(ecore_wl2_window_,
+                                         ECORE_WL2_INDICATOR_STATE_ON);
+    ecore_wl2_window_indicator_opacity_set(ecore_wl2_window_,
+                                           ECORE_WL2_INDICATOR_OPAQUE);
+  } else {
+    ecore_wl2_indicator_visible_type_set(
+        ecore_wl2_window_, ECORE_WL2_INDICATOR_VISIBLE_TYPE_HIDDEN);
+  }
+}

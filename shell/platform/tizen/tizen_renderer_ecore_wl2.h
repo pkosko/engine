@@ -31,6 +31,7 @@ class TizenRendererEcoreWl2 : public TizenRenderer {
                           int32_t angle) override;
   void SetRotate(int angle) override;
   void SetPreferredOrientations(const std::vector<int> &rotations) override;
+  void SetIndicatorEnabled(bool flag) override;
 
  private:
   bool InitializeRenderer();

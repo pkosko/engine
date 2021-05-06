@@ -87,7 +87,36 @@ void PlatformChannel::HandleMethodCall(
   } else if (method == "SystemChrome.setApplicationSwitcherDescription") {
     result->NotImplemented();
   } else if (method == "SystemChrome.setEnabledSystemUIOverlays") {
-    result->NotImplemented();
+    if (tizen_renderer) {
+      static const std::string kTop = "SystemUiOverlay.top";
+      static const std::string kBottom = "SystemUiOverlay.bottom";
+
+      const auto& list = call.arguments()[0];
+      bool top_bar_enabled = false;
+      // TODO handle bottom status bar if Tizen supports it
+      // bool bottom_bar_enabled = false;
+      for (rapidjson::Value::ConstValueIterator itr = list.Begin();
+           itr != list.End(); ++itr) {
+        const std::string& value = itr->GetString();
+        FT_LOGD("pkosko Passed value: %s", value.c_str());
+        if (kTop == value) {
+          FT_LOGD("pkosko Set indicator enabled");
+          top_bar_enabled = true;
+        } else if (kBottom == value) {
+          FT_LOGW("pkosko Bottom status bar in not supported - ignoring it");
+          // TODO handle bottom status bar if Tizen supports it
+          // bottom_bar_enabled = true;
+        }
+      }
+      tizen_renderer->SetIndicatorEnabled(top_bar_enabled);
+      // TODO handle bottom status bar if Tizen supports it
+      // tizen_renderer->SetBottomBarEnabled(bottom_bar_enabled);
+
+      result->Success();
+    } else {
+      result->Error("Not supported for service applications");
+    }
+
   } else if (method == "SystemChrome.restoreSystemUIOverlays") {
     result->NotImplemented();
   } else if (method == "SystemChrome.setSystemUIOverlayStyle") {

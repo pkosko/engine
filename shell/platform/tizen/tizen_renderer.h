@@ -38,6 +38,7 @@ class TizenRenderer {
   virtual void ResizeWithRotation(int32_t x, int32_t y, int32_t width,
                                   int32_t height, int32_t degree) = 0;
   virtual void SetPreferredOrientations(const std::vector<int>& rotations) = 0;
+  virtual void SetIndicatorEnabled(bool flag) = 0;
 
  protected:
   explicit TizenRenderer(TizenRenderer::Delegate& delegate);
