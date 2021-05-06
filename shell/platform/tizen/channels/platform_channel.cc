@@ -25,7 +25,7 @@ PlatformChannel::PlatformChannel(flutter::BinaryMessenger* messenger,
       });
   // renderer pointer is managed by TizenEmbedderEngine
   // !! can be nullptr in case of service application !!
-  tizen_renderer = renderer;
+  tizen_renderer_ = renderer;
 }
 
 PlatformChannel::~PlatformChannel() {}
@@ -49,7 +49,7 @@ void PlatformChannel::HandleMethodCall(
   } else if (method == "Clipboard.hasStrings") {
     result->NotImplemented();
   } else if (method == "SystemChrome.setPreferredOrientations") {
-    if (tizen_renderer) {
+    if (tizen_renderer_) {
       static const std::string kPortraitUp = "DeviceOrientation.portraitUp";
       static const std::string kPortraitDown = "DeviceOrientation.portraitDown";
       static const std::string kLandscapeLeft =
@@ -79,7 +79,7 @@ void PlatformChannel::HandleMethodCall(
         FT_LOGD("No rotations passed, using default values");
         rotations = {0, 90, 180, 270};
       }
-      tizen_renderer->SetPreferredOrientations(rotations);
+      tizen_renderer_->SetPreferredOrientations(rotations);
       result->Success();
     } else {
       result->Error("Not supported for service applications");

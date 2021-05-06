@@ -18,7 +18,7 @@ class PlatformChannel {
 
  private:
   std::unique_ptr<flutter::MethodChannel<rapidjson::Document>> channel_;
-  TizenRenderer* tizen_renderer;
+  TizenRenderer* tizen_renderer_;
 
   void HandleMethodCall(
       const flutter::MethodCall<rapidjson::Document>& call,
