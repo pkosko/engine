@@ -6,6 +6,7 @@
 #ifndef EMBEDDER_TIZEN_EMBEDDER_ENGINE_H_
 #define EMBEDDER_TIZEN_EMBEDDER_ENGINE_H_
 
+#include <map>
 #include <memory>
 
 #include "flutter/shell/platform/common/cpp/client_wrapper/include/flutter/plugin_registrar.h"
@@ -24,18 +25,18 @@
 #include "flutter/shell/platform/tizen/public/flutter_tizen_texture_registrar.h"
 #include "flutter/shell/platform/tizen/tizen_event_loop.h"
 #include "flutter/shell/platform/tizen/tizen_renderer.h"
-#ifdef FLUTTER_TIZEN_4
-#include "flutter/shell/platform/tizen/tizen_renderer_ecore_wl.h"
+#ifdef TIZEN_RENDERER_EVAS_GL
+#include "flutter/shell/platform/tizen/tizen_renderer_evas_gl.h"
 #else
 #include "flutter/shell/platform/tizen/tizen_renderer_ecore_wl2.h"
-#endif
 #include "flutter/shell/platform/tizen/tizen_vsync_waiter.h"
+#endif
 #include "flutter/shell/platform/tizen/touch_event_handler.h"
 
 // State associated with the plugin registrar.
 struct FlutterDesktopPluginRegistrar {
   // The engine that owns this state object.
-  TizenEmbedderEngine* engine;
+  FlutterTizenEngine* engine;
 
   // The plugin texture registrar handle given to API clients.
   std::unique_ptr<FlutterTextureRegistrar> texture_registrar;
@@ -44,7 +45,7 @@ struct FlutterDesktopPluginRegistrar {
 // State associated with the messenger used to communicate with the engine.
 struct FlutterDesktopMessenger {
   // The engine that owns this state object.
-  TizenEmbedderEngine* engine = nullptr;
+  FlutterTizenEngine* engine = nullptr;
 };
 
 // Custom deleter for FlutterEngineAOTData.
@@ -60,19 +61,26 @@ struct FlutterTextureRegistrar {
 
   // The texture registrar managing external texture adapters.
   std::map<int64_t, std::unique_ptr<ExternalTextureGL>> textures;
+  std::mutex mutex;
 };
 
 using UniqueAotDataPtr = std::unique_ptr<_FlutterEngineAOTData, AOTDataDeleter>;
 
-enum DeviceProfile { kUnknown, kMobile, kWearable, kTV };
+enum DeviceProfile { kUnknown, kMobile, kWearable, kTV, kCommon };
 
 // Manages state associated with the underlying FlutterEngine.
-class TizenEmbedderEngine : public TizenRenderer::Delegate {
+class FlutterTizenEngine : public TizenRenderer::Delegate {
  public:
-  explicit TizenEmbedderEngine(
-      const FlutterWindowProperties& window_properties);
-  virtual ~TizenEmbedderEngine();
-  bool RunEngine(const FlutterEngineProperties& engine_properties);
+  explicit FlutterTizenEngine(bool headed);
+  virtual ~FlutterTizenEngine();
+
+  // Prevent copying.
+  FlutterTizenEngine(FlutterTizenEngine const&) = delete;
+  FlutterTizenEngine& operator=(FlutterTizenEngine const&) = delete;
+
+  void InitializeRenderer();
+
+  bool RunEngine(const FlutterDesktopEngineProperties& engine_properties);
   bool StopEngine();
 
   // Returns the currently configured Plugin Registrar.
@@ -84,12 +92,7 @@ class TizenEmbedderEngine : public TizenRenderer::Delegate {
 
   void SendWindowMetrics(int32_t width, int32_t height, double pixel_ratio);
   void SetWindowOrientation(int32_t degree);
-  void SendLocales();
-  void AppIsInactive();
-  void AppIsResumed();
-  void AppIsPaused();
-  void AppIsDetached();
-  void OnRotationChange(int degree) override;
+  void OnOrientationChange(int32_t degree) override;
 
   // The Flutter engine instance.
   FLUTTER_API_SYMBOL(FlutterEngine) flutter_engine;
@@ -101,7 +104,7 @@ class TizenEmbedderEngine : public TizenRenderer::Delegate {
   std::unique_ptr<flutter::IncomingMessageDispatcher> message_dispatcher;
 
   // The interface between the Flutter rasterizer and the platform.
-  std::unique_ptr<TizenRenderer> tizen_renderer;
+  std::unique_ptr<TizenRenderer> renderer;
 
   // The system channels for communicating between Flutter and the platform.
   std::unique_ptr<KeyEventChannel> key_event_channel;
@@ -114,25 +117,15 @@ class TizenEmbedderEngine : public TizenRenderer::Delegate {
   std::unique_ptr<PlatformViewChannel> platform_view_channel;
 
   const DeviceProfile device_profile;
-  const double device_dpi;
 
  private:
-  static bool MakeContextCurrent(void* user_data);
-  static bool ClearContext(void* user_data);
-  static bool Present(void* user_data);
-  static bool MakeResourceCurrent(void* user_data);
-  static uint32_t GetActiveFbo(void* user_data);
-  static FlutterTransformation Transformation(void* user_data);
-  static void* GlProcResolver(void* user_data, const char* name);
+  bool IsHeaded() { return renderer != nullptr; }
+
   static void OnFlutterPlatformMessage(
       const FlutterPlatformMessage* engine_message, void* user_data);
-  static void OnVsyncCallback(void* user_data, intptr_t baton);
-
   FlutterDesktopMessage ConvertToDesktopMessage(
       const FlutterPlatformMessage& engine_message);
-  static bool OnAcquireExternalTexture(void* user_data, int64_t texture_id,
-                                       size_t width, size_t height,
-                                       FlutterOpenGLTexture* texture);
+  FlutterRendererConfig GetRendererConfig();
 
   // The handlers listening to platform events.
   std::unique_ptr<KeyEventHandler> key_event_handler_;
@@ -150,10 +143,16 @@ class TizenEmbedderEngine : public TizenRenderer::Delegate {
   std::unique_ptr<flutter::PluginRegistrar> internal_plugin_registrar_;
 
   // The event loop for the main thread that allows for delayed task execution.
-  std::unique_ptr<TizenEventLoop> event_loop_;
+  std::unique_ptr<TizenPlatformEventLoop> event_loop_;
 
+#ifdef TIZEN_RENDERER_EVAS_GL
+  std::unique_ptr<TizenRenderEventLoop> render_loop_;
+#endif
+
+#ifndef TIZEN_RENDERER_EVAS_GL
   // The vsync waiter for the embedder.
   std::unique_ptr<TizenVsyncWaiter> tizen_vsync_waiter_;
+#endif
 
   // AOT data for this engine instance, if applicable.
   UniqueAotDataPtr aot_data_;

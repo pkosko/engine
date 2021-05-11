@@ -7,7 +7,7 @@
 #include <Ecore.h>
 #include <Ecore_IMF_Evas.h>
 
-#include "flutter/shell/platform/tizen/tizen_embedder_engine.h"
+#include "flutter/shell/platform/tizen/flutter_tizen_engine.h"
 #include "flutter/shell/platform/tizen/tizen_log.h"
 
 static constexpr char kSetEditingStateMethod[] = "TextInput.setEditingState";
@@ -202,63 +202,8 @@ Ecore_IMF_Keyboard_Locks EcoreInputModifierToEcoreIMFLock(
   return static_cast<Ecore_IMF_Keyboard_Locks>(lock);
 }
 
-Ecore_IMF_Device_Class EoreDeviceClassToEcoreIMFDeviceClass(
-    Ecore_Device_Class ecoreDeviceClass) {
-  switch (ecoreDeviceClass) {
-    case ECORE_DEVICE_CLASS_SEAT:
-      return ECORE_IMF_DEVICE_CLASS_SEAT;
-    case ECORE_DEVICE_CLASS_KEYBOARD:
-      return ECORE_IMF_DEVICE_CLASS_KEYBOARD;
-    case ECORE_DEVICE_CLASS_MOUSE:
-      return ECORE_IMF_DEVICE_CLASS_MOUSE;
-    case ECORE_DEVICE_CLASS_TOUCH:
-      return ECORE_IMF_DEVICE_CLASS_TOUCH;
-    case ECORE_DEVICE_CLASS_PEN:
-      return ECORE_IMF_DEVICE_CLASS_PEN;
-    case ECORE_DEVICE_CLASS_POINTER:
-      return ECORE_IMF_DEVICE_CLASS_POINTER;
-    case ECORE_DEVICE_CLASS_GAMEPAD:
-      return ECORE_IMF_DEVICE_CLASS_GAMEPAD;
-    case ECORE_DEVICE_CLASS_NONE:
-    default:
-      return ECORE_IMF_DEVICE_CLASS_NONE;
-  }
-}
-
-Ecore_IMF_Device_Subclass EoreDeviceSubClassToEcoreIMFDeviceSubClass(
-    Ecore_Device_Subclass ecoreDeviceSubclass) {
-  switch (ecoreDeviceSubclass) {
-    case ECORE_DEVICE_SUBCLASS_FINGER:
-      return ECORE_IMF_DEVICE_SUBCLASS_FINGER;
-    case ECORE_DEVICE_SUBCLASS_FINGERNAIL:
-      return ECORE_IMF_DEVICE_SUBCLASS_FINGERNAIL;
-    case ECORE_DEVICE_SUBCLASS_KNUCKLE:
-      return ECORE_IMF_DEVICE_SUBCLASS_KNUCKLE;
-    case ECORE_DEVICE_SUBCLASS_PALM:
-      return ECORE_IMF_DEVICE_SUBCLASS_PALM;
-    case ECORE_DEVICE_SUBCLASS_HAND_SIZE:
-      return ECORE_IMF_DEVICE_SUBCLASS_HAND_SIZE;
-    case ECORE_DEVICE_SUBCLASS_HAND_FLAT:
-      return ECORE_IMF_DEVICE_SUBCLASS_HAND_FLAT;
-    case ECORE_DEVICE_SUBCLASS_PEN_TIP:
-      return ECORE_IMF_DEVICE_SUBCLASS_PEN_TIP;
-    case ECORE_DEVICE_SUBCLASS_TRACKPAD:
-      return ECORE_IMF_DEVICE_SUBCLASS_TRACKPAD;
-    case ECORE_DEVICE_SUBCLASS_TRACKPOINT:
-      return ECORE_IMF_DEVICE_SUBCLASS_TRACKPOINT;
-    case ECORE_DEVICE_SUBCLASS_TRACKBALL:
-      return ECORE_IMF_DEVICE_SUBCLASS_TRACKBALL;
-    case ECORE_DEVICE_SUBCLASS_REMOCON:
-    case ECORE_DEVICE_SUBCLASS_VIRTUAL_KEYBOARD:
-      // FT_LOGW("There is no corresponding type");
-    case ECORE_DEVICE_SUBCLASS_NONE:
-    default:
-      return ECORE_IMF_DEVICE_SUBCLASS_NONE;
-  }
-}
-
 TextInputChannel::TextInputChannel(flutter::BinaryMessenger* messenger,
-                                   TizenEmbedderEngine* engine)
+                                   FlutterTizenEngine* engine)
     : channel_(std::make_unique<flutter::MethodChannel<rapidjson::Document>>(
           messenger, kChannelName, &flutter::JsonMethodCodec::GetInstance())),
       engine_(engine) {
@@ -278,7 +223,7 @@ TextInputChannel::TextInputChannel(flutter::BinaryMessenger* messenger,
   }
   if (imf_context_) {
     ecore_imf_context_client_window_set(
-        imf_context_, (void*)engine_->tizen_renderer->GetEcoreWindowId());
+        imf_context_, (void*)engine_->renderer->GetWindowId());
     RegisterIMFCallback();
   } else {
     FT_LOGE("Failed to create imfContext");
@@ -416,7 +361,14 @@ void TextInputChannel::SendStateUpdate(const flutter::TextInputModel& model) {
 
 bool TextInputChannel::FilterEvent(Ecore_Event_Key* keyDownEvent) {
   bool handled = false;
-  const char* device = ecore_device_name_get(keyDownEvent->dev);
+
+#ifdef TIZEN_RENDERER_EVAS_GL
+  // TODO: Hardware keyboard not supported when running in Evas GL mode.
+  bool isIME = true;
+#else
+  bool isIME = ecore_imf_context_keyboard_mode_get(imf_context_) ==
+          ECORE_IMF_INPUT_PANEL_SW_KEYBOARD_MODE;
+#endif
 
   Ecore_IMF_Event_Key_Down ecoreKeyDownEvent;
   ecoreKeyDownEvent.keyname = keyDownEvent->keyname;
@@ -428,16 +380,8 @@ bool TextInputChannel::FilterEvent(Ecore_Event_Key* keyDownEvent) {
       EcoreInputModifierToEcoreIMFModifier(keyDownEvent->modifiers);
   ecoreKeyDownEvent.locks =
       EcoreInputModifierToEcoreIMFLock(keyDownEvent->modifiers);
-  ecoreKeyDownEvent.dev_name = device;
-  ecoreKeyDownEvent.dev_class = EoreDeviceClassToEcoreIMFDeviceClass(
-      ecore_device_class_get(keyDownEvent->dev));
-  ecoreKeyDownEvent.dev_subclass = EoreDeviceSubClassToEcoreIMFDeviceSubClass(
-      ecore_device_subclass_get(keyDownEvent->dev));
-#ifndef FLUTTER_TIZEN_4
+  ecoreKeyDownEvent.dev_name = isIME ? "ime" : "";
   ecoreKeyDownEvent.keycode = keyDownEvent->keycode;
-#endif
-
-  bool isIME = strcmp(device, "ime") == 0;
 
   if (isIME && strcmp(keyDownEvent->key, "Select") == 0) {
     if (engine_->device_profile == DeviceProfile::kWearable) {
@@ -595,10 +539,9 @@ void TextInputChannel::OnPreedit(std::string str, int cursor_pos) {
 
   have_preedit_ = false;
   if (edit_status_ == EditStatus::kPreeditStart) {
-    TextRange selection = active_model_->selection();
-    preedit_start_pos_ = selection.base();
+    preedit_start_pos_ = active_model_->selection().base();
     active_model_->AddText(str);
-    preedit_end_pos_ = selection.base();
+    preedit_end_pos_ = active_model_->selection().base();
     have_preedit_ = true;
     SendStateUpdate(*active_model_);
     FT_LOGD("preedit start pos[%d], preedit end pos[%d]", preedit_start_pos_,

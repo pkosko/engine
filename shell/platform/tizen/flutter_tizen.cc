@@ -5,44 +5,42 @@
 
 #include "public/flutter_tizen.h"
 
+#include <inttypes.h>
+
 #include "flutter/shell/platform/common/cpp/client_wrapper/include/flutter/plugin_registrar.h"
 #include "flutter/shell/platform/common/cpp/client_wrapper/include/flutter/standard_message_codec.h"
 #include "flutter/shell/platform/common/cpp/incoming_message_dispatcher.h"
+#include "flutter/shell/platform/tizen/flutter_tizen_engine.h"
 #include "flutter/shell/platform/tizen/public/flutter_platform_view.h"
 #include "flutter/shell/platform/tizen/public/flutter_tizen_texture_registrar.h"
-#include "flutter/shell/platform/tizen/tizen_embedder_engine.h"
 #include "flutter/shell/platform/tizen/tizen_log.h"
 
-// Opaque reference to a Tizen embedder engine.
-struct FlutterWindowControllerState {
-  std::unique_ptr<TizenEmbedderEngine> engine;
-};
+// Returns the engine corresponding to the given opaque API handle.
+static FlutterTizenEngine* EngineFromHandle(FlutterDesktopEngineRef ref) {
+  return reinterpret_cast<FlutterTizenEngine*>(ref);
+}
 
-FlutterWindowControllerRef FlutterCreateWindow(
-    const FlutterWindowProperties& window_properties,
-    const FlutterEngineProperties& engine_properties) {
+// Returns the opaque API handle for the given engine instance.
+static FlutterDesktopEngineRef HandleForEngine(FlutterTizenEngine* engine) {
+  return reinterpret_cast<FlutterDesktopEngineRef>(engine);
+}
+
+FlutterDesktopEngineRef FlutterDesktopRunEngine(
+    const FlutterDesktopEngineProperties& engine_properties, bool headed) {
   StartLogging();
 
-  auto state = std::make_unique<FlutterWindowControllerState>();
-  state->engine = std::make_unique<TizenEmbedderEngine>(window_properties);
-
-  if (!state->engine->RunEngine(engine_properties)) {
+  auto engine = std::make_unique<FlutterTizenEngine>(headed);
+  if (!engine->RunEngine(engine_properties)) {
     FT_LOGE("Failed to run the Flutter engine.");
     return nullptr;
   }
-
-  return state.release();
+  return HandleForEngine(engine.release());
 }
 
-void FlutterDestoryWindow(FlutterWindowControllerRef controller) {
-  if (controller->engine) {
-    controller->engine->StopEngine();
-  }
-  delete controller;
-}
-
-bool FlutterRunsPrecompiledCode() {
-  return FlutterEngineRunsAOTCompiledDartCode();
+void FlutterDesktopShutdownEngine(FlutterDesktopEngineRef engine_ref) {
+  auto engine = EngineFromHandle(engine_ref);
+  engine->StopEngine();
+  delete engine;
 }
 
 void FlutterDesktopPluginRegistrarEnableInputBlocking(
@@ -51,11 +49,16 @@ void FlutterDesktopPluginRegistrarEnableInputBlocking(
 }
 
 FlutterDesktopPluginRegistrarRef FlutterDesktopGetPluginRegistrar(
-    FlutterWindowControllerRef controller, const char* plugin_name) {
+    FlutterDesktopEngineRef engine, const char* plugin_name) {
   // Currently, one registrar acts as the registrar for all plugins, so the
   // name is ignored. It is part of the API to reduce churn in the future when
   // aligning more closely with the Flutter registrar system.
-  return controller->engine->GetPluginRegistrar();
+  return EngineFromHandle(engine)->GetPluginRegistrar();
+}
+
+FlutterDesktopMessengerRef FlutterDesktopEngineGetMessenger(
+    FlutterDesktopEngineRef engine) {
+  return EngineFromHandle(engine)->messenger.get();
 }
 
 FlutterDesktopMessengerRef FlutterDesktopPluginRegistrarGetMessenger(
@@ -128,50 +131,35 @@ void FlutterDesktopMessengerSetCallback(FlutterDesktopMessengerRef messenger,
                                                             user_data);
 }
 
-void FlutterNotifyLocaleChange(FlutterWindowControllerRef controller) {
-  if (controller->engine) {
-    controller->engine->SendLocales();
-  }
+void FlutterDesktopNotifyLocaleChange(FlutterDesktopEngineRef engine) {
+  EngineFromHandle(engine)->localization_channel->SendLocales();
 }
 
-void FlutterNotifyAppIsInactive(FlutterWindowControllerRef controller) {
-  if (controller->engine) {
-    controller->engine->AppIsInactive();
-  }
+void FlutterDesktopNotifyAppIsInactive(FlutterDesktopEngineRef engine) {
+  EngineFromHandle(engine)->lifecycle_channel->AppIsInactive();
 }
 
-void FlutterNotifyAppIsResumed(FlutterWindowControllerRef controller) {
-  if (controller->engine) {
-    controller->engine->AppIsResumed();
-  }
+void FlutterDesktopNotifyAppIsResumed(FlutterDesktopEngineRef engine) {
+  EngineFromHandle(engine)->lifecycle_channel->AppIsResumed();
 }
 
-void FlutterNotifyAppIsPaused(FlutterWindowControllerRef controller) {
-  if (controller->engine) {
-    controller->engine->AppIsPaused();
-  }
+void FlutterDesktopNotifyAppIsPaused(FlutterDesktopEngineRef engine) {
+  EngineFromHandle(engine)->lifecycle_channel->AppIsPaused();
 }
 
-void FlutterNotifyAppIsDetached(FlutterWindowControllerRef controller) {
-  if (controller->engine) {
-    controller->engine->AppIsDetached();
-  }
+void FlutterDesktopNotifyAppIsDetached(FlutterDesktopEngineRef engine) {
+  EngineFromHandle(engine)->lifecycle_channel->AppIsDetached();
 }
 
-void FlutterNotifyLowMemoryWarning(FlutterWindowControllerRef controller) {
-  if (controller->engine->flutter_engine) {
-    FlutterEngineNotifyLowMemoryWarning(controller->engine->flutter_engine);
-  }
-}
-
-void FlutterRotateWindow(FlutterWindowControllerRef controller,
-                         int32_t degree) {
-  FT_LOGW("Deprecated API. Use SystemChrome.setPreferredOrientations instead.");
+void FlutterDesktopNotifyLowMemoryWarning(FlutterDesktopEngineRef engine) {
+  auto flutter_engine = EngineFromHandle(engine)->flutter_engine;
+  FlutterEngineNotifyLowMemoryWarning(flutter_engine);
 }
 
 int64_t FlutterRegisterExternalTexture(
     FlutterTextureRegistrarRef texture_registrar) {
   FT_LOGD("FlutterDesktopRegisterExternalTexture");
+  std::lock_guard<std::mutex> lock(texture_registrar->mutex);
   auto texture_gl = std::make_unique<ExternalTextureGL>();
   int64_t texture_id = texture_gl->TextureId();
   texture_registrar->textures[texture_id] = std::move(texture_gl);
@@ -184,28 +172,32 @@ int64_t FlutterRegisterExternalTexture(
 
 bool FlutterUnregisterExternalTexture(
     FlutterTextureRegistrarRef texture_registrar, int64_t texture_id) {
+  std::lock_guard<std::mutex> lock(texture_registrar->mutex);
   auto it = texture_registrar->textures.find(texture_id);
   if (it != texture_registrar->textures.end())
     texture_registrar->textures.erase(it);
-  return (FlutterEngineUnregisterExternalTexture(
-              texture_registrar->flutter_engine, texture_id) == kSuccess);
+  bool ret = FlutterEngineUnregisterExternalTexture(
+                 texture_registrar->flutter_engine, texture_id) == kSuccess;
+  return ret;
 }
 
 bool FlutterMarkExternalTextureFrameAvailable(
     FlutterTextureRegistrarRef texture_registrar, int64_t texture_id,
     void* tbm_surface) {
+  std::lock_guard<std::mutex> lock(texture_registrar->mutex);
   auto it = texture_registrar->textures.find(texture_id);
   if (it == texture_registrar->textures.end()) {
-    FT_LOGE("can't find texture texture_id = %lld", texture_id);
+    FT_LOGE("can't find texture texture_id = %" PRId64, texture_id);
     return false;
   }
   if (!texture_registrar->textures[texture_id]->OnFrameAvailable(
           (tbm_surface_h)tbm_surface)) {
-    FT_LOGE("OnFrameAvailable fail texture_id = %lld", texture_id);
+    // If a texture that has not been used already exists, it can fail
     return false;
   }
-  return (FlutterEngineMarkExternalTextureFrameAvailable(
-              texture_registrar->flutter_engine, texture_id) == kSuccess);
+  bool ret = FlutterEngineMarkExternalTextureFrameAvailable(
+                 texture_registrar->flutter_engine, texture_id) == kSuccess;
+  return ret;
 }
 
 void FlutterRegisterViewFactory(
@@ -218,25 +210,25 @@ void FlutterRegisterViewFactory(
 
 FlutterDesktopTextureRegistrarRef FlutterDesktopRegistrarGetTextureRegistrar(
     FlutterDesktopPluginRegistrarRef registrar) {
-  FT_LOGE("Tizen DesktopTexture support is not implemented yet.");
+  FT_UNIMPLEMENTED();
   return nullptr;
 }
 
 int64_t FlutterDesktopTextureRegistrarRegisterExternalTexture(
     FlutterDesktopTextureRegistrarRef texture_registrar,
     const FlutterDesktopTextureInfo* texture_info) {
-  FT_LOGE("Tizen DesktopTexture support is not implemented yet.");
+  FT_UNIMPLEMENTED();
   return -1;
 }
 
 bool FlutterDesktopTextureRegistrarUnregisterExternalTexture(
     FlutterDesktopTextureRegistrarRef texture_registrar, int64_t texture_id) {
-  FT_LOGE("Tizen DesktopTexture support is not implemented yet.");
+  FT_UNIMPLEMENTED();
   return false;
 }
 
 bool FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable(
     FlutterDesktopTextureRegistrarRef texture_registrar, int64_t texture_id) {
-  FT_LOGE("Tizen DesktopTexture support is not implemented yet.");
+  FT_UNIMPLEMENTED();
   return false;
 }
