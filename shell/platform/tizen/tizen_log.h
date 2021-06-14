@@ -35,10 +35,13 @@ log_priority GetMinLoggingLevel();
 #define __LOG(prio, fmt, args...) dlog_print(prio, LOG_TAG, fmt, ##args)
 #endif
 
-#define __FT_LOG(prio, fmt, args...)                                          \
-  if (prio >= GetMinLoggingLevel()) {                                         \
-    __LOG(prio, "%s: %s(%d) > " fmt, __MODULE__, __func__, __LINE__, ##args); \
-  }
+#define __FT_LOG(prio, fmt, args...)                                   \
+  do {                                                                 \
+    if (prio >= GetMinLoggingLevel()) {                                \
+      __LOG(prio, "%s: %s(%d) > " fmt, __MODULE__, __func__, __LINE__, \
+            ##args);                                                   \
+    }                                                                  \
+  } while (0)
 
 #define FT_LOGD(fmt, args...) __FT_LOG(DLOG_DEBUG, fmt, ##args)
 #define FT_LOGI(fmt, args...) __FT_LOG(DLOG_INFO, fmt, ##args)
