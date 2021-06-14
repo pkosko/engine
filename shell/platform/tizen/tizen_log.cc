@@ -12,15 +12,14 @@ static int stderr_pipe[2];
 static pthread_t stdout_thread;
 static pthread_t stderr_thread;
 static bool is_running = false;
+static log_priority min_priority_level = DLOG_ERROR;
 
-// Handle filtering of logs
-static log_priority prio_min_ = DLOG_ERROR;
 void SetMinLoggingLevel(log_priority p) {
-  prio_min_ = p;
+  min_priority_level = p;
 };
 
 log_priority GetMinLoggingLevel() {
-  return prio_min_;
+  return min_priority_level;
 };
 
 static void* LoggingFunction(void* arg) {

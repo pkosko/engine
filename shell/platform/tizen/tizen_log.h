@@ -14,7 +14,7 @@
 // The threads can be started only once per process.
 void StartLogging();
 
-// Handle filtering of logs
+// Handles filtering of logs.
 void SetMinLoggingLevel(log_priority p);
 log_priority GetMinLoggingLevel();
 
