@@ -79,7 +79,6 @@ void TizenVsyncWaiter::RequestVblankLoop(void* data, Ecore_Thread* thread) {
       continue;
     }
     if (msg->value == QUEUE_QUIT) {
-      FT_LOGE("Message queue quit");
       return;
     }
     if (!tizen_vsync_waiter->TDMValid()) {

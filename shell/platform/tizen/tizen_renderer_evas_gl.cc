@@ -537,7 +537,7 @@ void* TizenRendererEvasGL::OnProcResolver(const char* name) {
   GL_FUNC(glTexStorage3DMultisample)
 #undef GL_FUNC
 
-  FT_LOGE("Could not resolve: %s", name);
+  FT_LOGW("Could not resolve: %s", name);
   return nullptr;
 }
 
