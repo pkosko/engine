@@ -42,7 +42,7 @@ static void* LoggingFunction(void* arg) {
 
 void StartLogging() {
   if (is_running) {
-    FT_LOGD("The threads are already running.");
+    FT_LOGI("The threads are already running.");
     return;
   }
 

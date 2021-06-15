@@ -79,7 +79,7 @@ void TizenVsyncWaiter::RequestVblankLoop(void* data, Ecore_Thread* thread) {
       continue;
     }
     if (msg->value == QUEUE_QUIT) {
-      FT_LOGD("Message queue quit");
+      FT_LOGE("Message queue quit");
       return;
     }
     if (!tizen_vsync_waiter->TDMValid()) {
@@ -97,7 +97,6 @@ void TizenVsyncWaiter::RequestVblankLoop(void* data, Ecore_Thread* thread) {
 }
 
 void TizenVsyncWaiter::VblankLoopFinish(void* data, Ecore_Thread* thread) {
-  FT_LOGD("VblankLoopFinish.");
   if (vblank_thread_queue) {
     eina_thread_queue_free(vblank_thread_queue);
     vblank_thread_queue = nullptr;
