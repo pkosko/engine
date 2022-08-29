@@ -34,7 +34,7 @@ RUN apt-get install -y libjpeg-dev libopenjp2-7-dev libgif-dev libtiff5-dev libr
     apt-get clean
 
 # Build and install EFL for host build.
-RUN git clone --depth 1 https://git.enlightenment.org/core/efl.git -b efl-1.25 /tmp/efl && \
+RUN git clone --depth 1 https://git.enlightenment.org/enlightenment/efl.git -b efl-1.25 /tmp/efl && \
     meson -Dbuild-examples=false -Dbuild-tests=false /tmp/efl /tmp/efl/build && \
     ninja -C /tmp/efl/build && \
     ninja -C /tmp/efl/build install && \
@@ -90,6 +90,7 @@ RUN git clone --depth=1 https://github.com/flutter-tizen/flutter-tizen.git
 ENV TIZEN_STUDIO_USER_HOME=/home/tizenstudiouser
 
 ENV PATH=$PATH:$TIZEN_STUDIO_USER_HOME/flutter-tizen/bin
+ENV PATH=$PATH:$TIZEN_STUDIO_USER_HOME/flutter-tizen/flutter/bin
 
 USER root
 ENV PATH=$PATH:$TIZEN_STUDIO_USER_HOME/flutter-tizen/bin
