@@ -1,0 +1,6 @@
+
+To rebuild docker (force rebuild):
+1. docker build --no-cache -t art.sec.samsung.net/flutter-tizen_docker/ahub_docker:latest .
+2. rm ~/.docker/config.json
+3. docker login art.sec.samsung.net
+4. docker push art.sec.samsung.net/flutter-tizen_docker/ahub_docker
